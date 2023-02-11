@@ -12,6 +12,7 @@ var normalsArray = [];
 var linePoints;
 
 var wireFrameMode = false;          // if True draw in WireFrame Mode else draw Normal
+var animation = false;
 
 var near = -10;
 var far = 10;
@@ -21,7 +22,7 @@ var right = 3.0;
 var ytop =3.0;
 var bottom = -3.0;
 
-
+var animReq;
 
 // Square Vertices
 var squareV1 = vec4(0.5,0.5,0.5,1);
@@ -35,19 +36,20 @@ var squareV8 = vec4(-0.5,-0.5,-0.5,1);
 
 // Chalkin control points
 let lineControlPoints = [
-    vec4(-2.5, -1.0, 0.0, 1.0),
-    vec4(-3.25, 1.0, 0.0, 1.0),
-    vec4(-1.55, 2.0, 0.0, 1.0),
-    vec4(2.75, 1.4, 0.0, 1.0),
-    vec4(3.25, 0.5, 0.0, 1.0),
-    vec4(1.75, -0.5, 0.0, 1.0),
-    vec4(2.5, -1.5, 0.0, 1.0),
-    vec4(1.0, -1.15, 0.0, 1.0),
-    vec4(-1.0, -1.5, 0.0, 1.0),
-    
+    vec4(-3.55, 4.0, 0.0, 1.0),
+    vec4(4.75, 3.4, 0.0, 1.0),
+    vec4(5.25, 2.5, 0.0, 1.0),
+    vec4(2.5, -0.5, 0.0, 1.0),
+    vec4(4.5, -3.5, 0.0, 1.0),
+    vec4(0.0, -2.15, 0.0, 1.0),
+    vec4(-3.0, -3.5, 0.0, 1.0),
+    vec4(-4.5, -2.0, 0.0, 1.0),
+    vec4(-4.5, -2.0, 0.0, 1.0),
+    vec4(-5.25, 3.0, 0.0, 1.0),
 ];
 
-
+var translateMatrix;
+var translateMatrixLoc;
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
 
@@ -164,7 +166,7 @@ window.onload = function init() {
 
     modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
     projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
-
+    
     
     setupProjection();
 
@@ -176,12 +178,17 @@ window.onload = function init() {
 
     
     renderObjects(wireFrameMode);
+    //translateAlongCurve();
 }
 
 function drawCube(){
     pointsArray=[];
     normalsArray= [];
     cube(squareV1,squareV2,squareV3,squareV4,squareV5,squareV6,squareV7,squareV8,numTimesToSubdivide);
+
+    //translateMatrix = translate(-3.55,4.0,0);
+    translateMatrixLoc = gl.getUniformLocation(program,'translateMatrix');
+    gl.uniformMatrix4fv(translateMatrixLoc, false, flatten(translateMatrix));
 
     var vBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -193,6 +200,11 @@ function drawCube(){
 }
 
 function drawChaikin() {
+
+    translateMatrix = translate(0.0,0,0);
+    translateMatrixLoc = gl.getUniformLocation(program,'translateMatrix');
+    gl.uniformMatrix4fv(translateMatrixLoc, false, flatten(translateMatrix));
+
     linePoints = chaikin(lineControlPoints, chaikinSubdivision);
     var vBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -273,12 +285,24 @@ function keyDownListener(event){
             drawCube();
             renderObjects(wireFrameMode);
             break;
+
+        case 'a':
+            if(animation){
+                animation = false;
+                cancelAnimationFrame(animReq);
+            }
+            else{
+                animation = true;
+                translateAlongCurve();
+            }
     }
 }
 
+
+// Setup Camera and Projection matrix
 function setupProjection(){
     
-    eye = vec3(0, 0, 4);
+    eye = vec3(0, 0, 6);
 
     // Camera Matrix (Position, Looking at, Up)
     modelViewMatrix = lookAt(eye, at , up);
@@ -290,10 +314,28 @@ function setupProjection(){
     gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix) );
 }
 
+
+
+// Render Chaikin curve onto Screen
 function renderChaikin() {
     gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.drawArrays(gl.LINE_LOOP,0,linePoints.length);
 }
+
+var alpha = 0.1;
+function translateAlongCurve(){
+    drawChaikin();
+    renderChaikin();
+    var point1 = lineControlPoints[0];
+    var point2 = lineControlPoints[1];
+    var interp = mix(point1,point2,alpha);
+    translateMatrix = translate(interp[0],interp[1],0);
+    alpha+=0.005;
+    drawCube();
+    renderObjects(wireFrameMode);
+    animReq = requestAnimationFrame(translateAlongCurve);
+}
+
 
 // Previous Model matrix location
 function renderObjects(wireFrameMode) {
