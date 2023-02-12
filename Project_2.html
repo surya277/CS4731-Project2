@@ -5,32 +5,111 @@
 
 // assume both position and normal are in homogeneous form
 
-attribute vec4 vPosition;
+precision highp float;
+attribute vec4 vPosition,vNormal;
+
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
 uniform mat4 translateMatrix;
+
+uniform vec4 lightDiffuse, lightSpecular, lightAmbient;
+uniform vec4 materialDiffuse, materialSpecular, materialAmbient;
+
+uniform float shininess;
+uniform vec4 lightPosition;
+
 varying vec4 fColor;
 
+varying vec3 light,normal, R, V;
+
+uniform float gouradCheck;
+uniform float wireframeCheck;
 
 void main()
 {
+    //Diffuse
+    if(wireframeCheck != 1.0)
+    {
+        vec4 nm = vNormal;
+        nm.w = 1.0;
+        vec3 pos = (modelViewMatrix * nm).xyz;
+        light = normalize(lightPosition.xyz - pos);
+        normal = normalize(modelViewMatrix * vNormal).xyz;
+
+    
+        // Specular
+        V = normalize(-pos);
+
+        //r = (2 (l · n ) n) - l
+        R = 2.0 * (dot(light,normal) * normal) - light;
+
+        if(gouradCheck == 1.0)
+        {
+            // Diffuse
+            // Id = Ld Kd (l . n)
+            vec4 diffuse = lightDiffuse * materialDiffuse * dot(light,normal);
+
+            //Specular
+            //Is = Ls Ks dot(V, R)^a
+            vec4 specular = lightSpecular * materialSpecular * pow(max(dot(V,R),0.0),shininess);
+
+            //Ambient
+            //Ia = Laka
+            vec4 ambient = lightAmbient * materialAmbient;
+
+            
+            fColor = diffuse + specular + ambient;
+            fColor.a = 1.0;
+        }
+    }
+    else{
+        fColor = vec4(1.0,1.0,1.0,1.0);
+    }
     gl_Position = projectionMatrix * modelViewMatrix * translateMatrix * vPosition;
-	fColor = vec4( 1.0, 1.0, 1.0, 1.0 );
 }
 </script>
 
 <script id="fragment-shader" type="x-shader/x-fragment">
 
-precision mediump float;
+precision highp float;
+
+uniform vec4 lightDiffuse, lightSpecular, lightAmbient;
+uniform vec4 materialDiffuse, materialSpecular, materialAmbient;
+
+uniform float shininess;
 
 varying vec4 fColor;
 
-void
-main()
+varying vec3 light,normal, R, V;
+
+uniform float gouradCheck;
+uniform float wireframeCheck;
+
+void main()
 {
+    if(gouradCheck == 0.0 && wireframeCheck != 1.0)
+    {
+        // Diffuse
+        // Id = Ld Kd (l . n)
+        vec4 diffuse = lightDiffuse * materialDiffuse * dot(light,normal);
 
-    gl_FragColor = fColor;
+        //Specular
+        //Is = Ls Ks dot(V, R)^a
+        vec4 specular = lightSpecular * materialSpecular * pow(max(dot(V,R),0.0),shininess);
 
+        //Ambient
+        //Ia = Laka
+        vec4 ambient = lightAmbient * materialAmbient;
+
+        
+        vec4 fColor1 = diffuse + specular + ambient;
+        fColor1.a = 1.0;
+        gl_FragColor = fColor1;
+    }
+    else
+    {
+        gl_FragColor = fColor;
+    }
 }
 </script>
 

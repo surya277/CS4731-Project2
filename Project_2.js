@@ -11,16 +11,8 @@ var pointsArray = [];
 var normalsArray = [];
 var linePoints;
 
-var wireFrameMode = false;          // if True draw in WireFrame Mode else draw Normal
+var wireFrameMode = 0.0;          // if True draw in WireFrame Mode else draw Normal
 var animation = false;
-
-var near = -10;
-var far = 10;
-
-var left = -3.0;
-var right = 3.0;
-var ytop =3.0;
-var bottom = -3.0;
 
 var animReq;
 
@@ -37,18 +29,31 @@ var squareV8 = vec4(-0.5,-0.5,-0.5,1);
 // Chalkin control points
 let lineControlPoints = [
     vec4(-3.55, 4.0, 0.0, 1.0),
-    vec4(4.75, 3.4, 0.0, 1.0),
-    vec4(5.25, 2.5, 0.0, 1.0),
-    vec4(2.5, -0.5, 0.0, 1.0),
-    vec4(4.5, -3.5, 0.0, 1.0),
-    vec4(0.0, -2.15, 0.0, 1.0),
-    vec4(-3.0, -3.5, 0.0, 1.0),
+    vec4(4.75, 3.4, 0.5, 1.0),
+    vec4(2.5, -0.5, 1.0, 1.0),
+    vec4(4.5, -3.5, -1.0, 1.0),
+    vec4(0.0, -2.15, -2.0, 1.0),
+    vec4(-3.0, -3.5, 1.0, 1.0),
     vec4(-4.5, -2.0, 0.0, 1.0),
     vec4(-4.5, -2.0, 0.0, 1.0),
-    vec4(-5.25, 3.0, 0.0, 1.0),
+    vec4(-5.25, 3.0, -1.0, 1.0),
+    vec4(-3.55, 4.0, 0.0, 1.0),
 ];
 
+var lightMode = 0.0;
+
+var lightPosition = vec4(2.5, 2.5, -1.0, 1.0 );  
+var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
+var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
+var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+
+var materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
+var materialDiffuse = vec4( 1.0, 1.0, 0.0, 1.0 );
+var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialShininess = 20.0;
+
 var translateMatrix;
+var previoustranslateMatrix;
 var translateMatrixLoc;
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
@@ -164,21 +169,35 @@ window.onload = function init() {
     program = initShaders( gl, "vertex-shader", "fragment-shader" );
     gl.useProgram( program );
 
+    
+
+
     modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
     projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
     
+    gl.uniform4fv(gl.getUniformLocation(program, "lightDiffuse"), flatten(lightDiffuse));
+    gl.uniform4fv(gl.getUniformLocation(program, "materialDiffuse"), flatten(materialDiffuse));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightSpecular"), flatten(lightSpecular));
+    gl.uniform4fv(gl.getUniformLocation(program, "materialSpecular"), flatten(materialSpecular));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightAmbient"), flatten(lightAmbient));
+    gl.uniform4fv(gl.getUniformLocation(program, "materialAmbient"), flatten(materialAmbient));
     
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+
+    
+
     setupProjection();
 
     drawChaikin();
     renderChaikin();
+    translateMatrix = translate(-3.55, 4.0, 0.0);
     drawCube();
     
     
 
     
     renderObjects(wireFrameMode);
-    //translateAlongCurve();
 }
 
 function drawCube(){
@@ -197,10 +216,22 @@ function drawCube(){
     var vPosition = gl.getAttribLocation( program, "vPosition");
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
+
+    var vNormal = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vNormal);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(normalsArray), gl.STATIC_DRAW);
+
+    var vNormalPosition = gl.getAttribLocation( program, "vNormal");
+    gl.vertexAttribPointer(vNormalPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormalPosition);
+
+    
+    
+
 }
 
 function drawChaikin() {
-
+    previoustranslateMatrix = translateMatrix;
     translateMatrix = translate(0.0,0,0);
     translateMatrixLoc = gl.getUniformLocation(program,'translateMatrix');
     gl.uniformMatrix4fv(translateMatrixLoc, false, flatten(translateMatrix));
@@ -213,6 +244,8 @@ function drawChaikin() {
     var vPosition = gl.getAttribLocation( program, "vPosition");
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
+
+    translateMatrix = previoustranslateMatrix;
     //gl.drawArrays(gl.LINE_STRIP, 0, lineControlPoints.length);
 }
 
@@ -232,6 +265,7 @@ function keyDownListener(event){
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             drawChaikin();
             renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
             drawCube();
             renderObjects(wireFrameMode);
             break;
@@ -244,19 +278,26 @@ function keyDownListener(event){
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             drawChaikin();
             renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
             drawCube();
             renderObjects(wireFrameMode);
             break;
 
         // Set WireFrame Mode
         case 'm':           
-            if(wireFrameMode)
-                wireFrameMode = false;
-            else
-                wireFrameMode = true;
+            if(wireFrameMode == 0.0){
+                wireFrameMode = 1.0;
+                console.log("Wireframe Mode");
+            }
+            else{
+                wireFrameMode = 0.0;
+                console.log("Lit Mode");
+            }
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.uniform1f(gl.getUniformLocation(program, "wireframeCheck"), wireFrameMode);
             drawChaikin();
             renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
             drawCube();
             renderObjects(wireFrameMode);
             break;
@@ -270,6 +311,7 @@ function keyDownListener(event){
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             drawChaikin();
             renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
             drawCube();
             renderObjects(wireFrameMode);
             break;
@@ -282,6 +324,7 @@ function keyDownListener(event){
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             drawChaikin();
             renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
             drawCube();
             renderObjects(wireFrameMode);
             break;
@@ -295,6 +338,26 @@ function keyDownListener(event){
                 animation = true;
                 translateAlongCurve();
             }
+            break;
+
+        
+        case 'l':
+            if(lightMode == 1.0){
+                lightMode = 0.0;
+                console.log("Phong");
+            }
+            else{
+                lightMode = 1.0;
+                console.log("Gouraud");
+            }
+            gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.uniform1f(gl.getUniformLocation(program, "gouradCheck"), lightMode);
+            drawChaikin();
+            renderChaikin();
+            //translateMatrix = translate(linePoints[0][0], linePoints[0][1], linePoints[0][2]);
+            drawCube();
+            renderObjects(wireFrameMode);
+            break;
     }
 }
 
@@ -319,18 +382,43 @@ function setupProjection(){
 // Render Chaikin curve onto Screen
 function renderChaikin() {
     gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.drawArrays(gl.LINE_LOOP,0,linePoints.length);
+    if(wireFrameMode == 0.0){
+        wireFrameMode = 1.0;
+        gl.uniform1f(gl.getUniformLocation(program, "wireframeCheck"), wireFrameMode);
+        gl.drawArrays(gl.LINE_LOOP,0,linePoints.length);
+        wireFrameMode = 0.0;
+        gl.uniform1f(gl.getUniformLocation(program, "wireframeCheck"), wireFrameMode);
+
+    }
+    else{
+        gl.drawArrays(gl.LINE_LOOP,0,linePoints.length);
+    }
+        
+    
 }
 
 var alpha = 0.1;
+var i=0;
+var interp;
 function translateAlongCurve(){
     drawChaikin();
     renderChaikin();
-    var point1 = lineControlPoints[0];
-    var point2 = lineControlPoints[1];
-    var interp = mix(point1,point2,alpha);
-    translateMatrix = translate(interp[0],interp[1],0);
-    alpha+=0.005;
+    
+    if(alpha<1 && i+1 < linePoints.length){
+        var point1 = linePoints[i];
+        var point2 = linePoints[i+1];
+        interp = mix(point1,point2,alpha);
+        
+    }
+    else{
+        alpha = 0.1;
+        i++;
+    }
+    if(i>=linePoints.length-1)
+        i=0;
+
+    translateMatrix = translate(interp[0],interp[1],interp[2]);
+    alpha+=0.1 * (1/(chaikinSubdivision+1));
     drawCube();
     renderObjects(wireFrameMode);
     animReq = requestAnimationFrame(translateAlongCurve);
@@ -345,7 +433,7 @@ function renderObjects(wireFrameMode) {
     //gl.drawArrays(gl.LINE_LOOP,0,lineControlPoints.length);
     // Check if WireFrame Mode
     
-    if(wireFrameMode){
+    if(wireFrameMode == 1.0){
         for( var i=0; i<index; i+=3)
             gl.drawArrays( gl.LINE_LOOP, i, 3 );
     }
